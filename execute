@@ -1,0 +1,24 @@
+#include <iostream>
+#include"graph.cpp"
+using namespace std;
+int main()
+{
+	int i;
+	Graph G;
+	G.setup();
+	G.all_hobby_similarity();
+	G.all_location_match();
+	//array_generate(G.n);
+	int select;
+	while(1){
+		printf("是否继续查看推荐？ 是：1  否：0");
+		scanf("%d",&select);
+		if(select==0) break;
+		printf("请输入查询的个人编号：\n");
+		scanf("%d",&i);
+		G.intimacy_caculate(i);
+		G.recommendation(i);
+	}
+	
+	return 0;
+}
