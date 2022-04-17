@@ -1,5 +1,6 @@
 #include<iostream>
 #include<algorithm>
+#include<stack>
 #include<fstream>
 #include<sstream>
 #include<vector>
@@ -12,6 +13,9 @@ using namespace std;
 int personLink[MAX][MAX];  //人际交往距离 
 float hobby_simi[MAX][MAX];  //爱好相似度 
 float location_simi[MAX][MAX];  //同城同省概率 
+int path[MAX][MAX];
+string hobbies[16]={"篮球","足球","游泳","乒乓球","网球","骑行","跑步","跳舞",
+					"爬山","滑板","绘画","美食","美妆","追剧","阅读","编程"};
 struct relation{
 	int nodeid; //对方的id 
 	float intimacy; //亲密度
@@ -86,6 +90,9 @@ void Graph::setup() {
 		cout << "Faild to open the file!\n";
 	}
 	int tmp;
+	for(int i=0;i<n;i++){
+		net[i].node_id=i;
+	}
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < 16; j++) {
 			readhobby >> tmp;
@@ -117,10 +124,11 @@ void Graph::setup() {
 		net[i].name=line;
 		//cout<<net[i].name<<endl;
 	}
-	
 	cout<<"数据读取完毕！"<<endl;
-	ShortestPath_Floyd(n);
-	cout<<"最近社交距离计算完毕！"<<endl;
+	
+	//ShortestPath_Floyd(n);
+	
+	
 	for(i=0;i<n;i++){
 		for(int j=0;j<n;j++){
 			relations[i][j].nodeid=j;
@@ -133,9 +141,17 @@ void Graph::setup() {
 void Graph::ShortestPath_Floyd(int n){
 	for(int i = 0;i<n;i++){
 		for(int j = 0;j<n;j++){
+			if(i!=j){
+				path[i][j]=i;
+			}
+			else if(i==j){
+				path[i][j]=-1;
+			}
 			if(personLink[i][j] == 0&&i!=j){
 				personLink[i][j] = 100000;
+				path[i][j]=i;
 			}
+			
 		}
 	}
 	for(int k = 0; k<n ; k++){
@@ -143,10 +159,15 @@ void Graph::ShortestPath_Floyd(int n){
 			for(int w = 0; w<n ; w++){
 				if(personLink[v][w] > personLink[v][k] + personLink[k][w]){
 					personLink[v][w] = personLink[v][k] + personLink[k][w];
+					path[v][w] = path[k][w];
 				}
+//				else if(personLink[v][w] == personLink[v][k] + personLink[k][w]&&hobby_simi[v][w]>hobby_simi[k][w]){
+//					path[v][w]=path[k][w];
+//				}
 			}
 		}
 	}
+	cout<<"最近社交距离计算完毕！"<<endl;
 //	for(int i = 0;i<n;i++){
 //		for(int j = 0;j<n;j++){
 //			printf("%d  ",personLink[i][j]);
@@ -259,7 +280,8 @@ void array_generate(int n){
 
 float Graph::distance_trans(int dist){
 	float trans=exp(1-dist);
-	return trans;
+	if(dist==1) return 1.00;
+	else return 1.5*trans;
 } 
 
 void Graph::intimacy_caculate(int i) {
@@ -302,7 +324,7 @@ void Graph::intimacy_caculate(int i) {
 			intimacy=-1;
 		}
 		relations[i][j].intimacy=intimacy;
-		printf("%d--%.2f   ",relations[i][j].nodeid,relations[i][j].intimacy);
+		//printf("%d--%.2f   ",relations[i][j].nodeid,relations[i][j].intimacy);
 	}
 //	for(j=0;j<n;j++){
 //		cout<<relations[i][j].nodeid<<"--"<<relations[i][j].intimacy;
@@ -329,20 +351,41 @@ void Graph::recommendation(int i){
 //	for(int j=0;j<n;j++){
 //		printf("%.3f  ",location_simi[i][j]);
 //	}
+//	for(int j=0;j<n;j++){
+//		printf("%d  ",path[i][j]);
+//	}
+//	printf("\n");
+//	for(int j=0;j<n;j++){
+//		printf("%d  ",personLink[i][j]);
+//	}
+//	printf("\n");
 	
 	sort(relations[i],relations[i]+n,cmp);//推荐排序1:亲密度排序
-	int i1,j;
-	relation tmp;
-	for(i1=0;i1<n;i1++){ //第二排序： 
-		j=i1-1;
-		tmp=relations[i][i1];//之后的操作a[i]被污染，需要有一个tmp保存 
-		while(j>=0&&tmp.intimacy==relations[i][j].intimacy&&net[tmp.nodeid].friends<net[relations[i][j].nodeid].friends){
-			relations[i][j+1]=relations[i][j];
-			j--;
-		}
-		relations[i][j+1]=tmp;
-	}
-	int count=100;
+//	int i1,j;
+//	relation tmp;
+//	for(i1=0;i1<n;i1++){ //第二排序： 
+//		j=i1-1;
+//		tmp=relations[i][i1];//之后的操作a[i]被污染，需要有一个tmp保存 
+//		while(j>=0&&tmp.intimacy==relations[i][j].intimacy&&net[tmp.nodeid].friends<net[relations[i][j].nodeid].friends){
+//			relations[i][j+1]=relations[i][j];
+//			j--;
+//		}
+//		relations[i][j+1]=tmp;
+//	}
+	
+	string root=".\\recommend";
+	string vertex=".\\path";
+	string number=to_string(i);
+	root=root+number;
+	vertex=vertex+number;
+	ofstream write,writev;
+	string out1=root+".csv";
+	string out2=vertex+".csv";
+	write.open(out1,ios::out);
+	writev.open(out2,ios::out);
+	write<<"id"<<','<<"name"<<','<<"location"<<','<<"hobby1"<<','
+		 <<"hobby2"<<','<<"hobby3"<<','<<"hobby4"<<','<<"hobby5"<<','<<"hobby6"<<endl; 
+	int count=10;
 	for(int j=0;j<n;j++){
 		if(count<1) break; //推荐潜在亲密度最高的前10名 
 		int per=relations[i][j].nodeid;
@@ -350,12 +393,50 @@ void Graph::recommendation(int i){
 			continue;
 		}
 		count--;
+		
 		printf("\n\n");
-		printf("推荐潜在好友%d：",100-count);
+		printf("推荐潜在好友%d：%d\n",10-count,per);
+		
+		
+		stack<int> Path;
+		int k=path[i][per];
+		while(k!=i&&k!=-1){
+			Path.push(k);
+			k=path[i][k];
+			//printf("%d  ",k);
+		}
+		Path.push(i);
+		printf("关系路径：");
+		//write<<"关系路径：";
+		while(!Path.empty()){
+			k=Path.top();
+			Path.pop();
+			printf("%d->",k);
+			if(k!=i){
+				write<<net[k].node_id<<','<<net[k].name<<','<<net[k].location<<',';
+				for(int a=0;a<16;a++){
+					if(net[k].hobbys[a]==1){
+						write<<hobbies[a]<<',';
+					}
+				}
+				write<<endl;
+			}
+			//write<<k<<" ";
+			//writev<<k<<',';
+			if(!Path.empty()){
+				writev<<k<<','<<Path.top()<<endl;
+			}
+		}
+		printf("%d \n",per);
+		//write<<per<<endl;
+		writev<<k<<','<<per<<endl;
+		
 		printf("您与ta的潜在亲密度为%.3f\n",relations[i][j].intimacy);
 		printf("爱好相似度为：%.3f,社交距离权重为%.3f,同城系数为%.3f\n",hobby_simi[i][per],distance_trans(personLink[i][per]),location_simi[i][per]);
 		cout<<i<<"来自"<<net[i].location<<","<<per<<"来自"<<net[per].location<<endl;
 //		cout<<per<<"-"<<net[per].name<<"-"<<net[per].location<<endl;
+		//write<<"关系数据："<<hobby_simi[i][per]<<" "<<distance_trans(personLink[i][per])<<" "<<location_simi[i][per]<<endl;
+		
 		printf("您与ta的爱好相似度为：%.3f\n",hobby_simi[i][per]);
 		printf("在");
 		for(int a=0;a<16;a++){
@@ -364,5 +445,15 @@ void Graph::recommendation(int i){
 			}
 		}
 		printf("等有共同点\n");
+		
+		write<<net[per].node_id<<','<<net[per].name<<','<<net[per].location<<',';
+		for(int a=0;a<16;a++){
+			if(net[per].hobbys[a]==1){
+				write<<hobbies[a]<<',';
+			}
+		}
+		write<<endl; 
 	}
+	write.close();
+	writev.close();
 }
