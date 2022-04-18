@@ -9,6 +9,8 @@
 #include<math.h>
 #include"中文字符转换.cpp"
 #define MAX 4100
+#define pi 3.1415926535897932384626433832795
+#define EARTH_RADIUS 6378.137 //地球半径 KM
 using namespace std;
 int personLink[MAX][MAX];  //人际交往距离 
 float hobby_simi[MAX][MAX];  //爱好相似度 
@@ -24,13 +26,18 @@ struct relation{
 		intimacy=0;
 	} 
 };
+struct loca{
+	string cityname;
+	float longitude;
+	float latitude;
+};
 relation relations[MAX][MAX]; //亲密度 
 struct person_node {
 	int node_id; //结点有个编号
 	int age;
 	string name;
 	int hobbys[16];  //爱好，可以基于爱好推荐，爱好是01向量，规定了没人最多有6种爱好
-	string location;  //地理位置，可以匹配同城
+	loca location;  //地理位置，可以匹配同城
 	string school;    //校友选项
 	int friends;  //有直接关系的数目 
 };
@@ -47,9 +54,11 @@ struct Graph {
 	float get_hobby_similarity(int i,int j); //两人的爱好相似度 
 	void all_hobby_similarity(); //整体的爱好相似度，存在矩阵里
 	float location_match(wstring,wstring);//地名匹配度，判断是否来自一个地方 
+	float location_match(loca l1,loca l2);//按照地理位置匹配 
 	void all_location_match(); //整体的同城率 
 	float distance_trans(int dist);//交往距离转化函数 
 	void recommendation(int i); //推荐第i个人的潜在好友 
+	
 }; 
 
 int Graph::get_distance(int id1,int id2){
@@ -74,7 +83,6 @@ void Graph::setup() {
 		int i = atoi(field.c_str());
 		getline(sin, field, ','); //将字符串流sin中的字符读入到field字符串中，以逗号为分隔符 
 		int j = atoi(field.c_str());
-	//	cout << i << " "<< j << endl;
 		if(i!=j){
     		personLink[i][j] = 1;
 	    	personLink[j][i] = 1;
@@ -85,6 +93,7 @@ void Graph::setup() {
 		}
 	}
 	readout.close();
+	
 	ifstream readhobby(".\\hobbys.txt", ios::in);
 	if (!readhobby.is_open()) {
 		cout << "Faild to open the file!\n";
@@ -97,22 +106,23 @@ void Graph::setup() {
 		for (int j = 0; j < 16; j++) {
 			readhobby >> tmp;
 			net[i].hobbys[j] = tmp;
-			//cout << net[i].hobbys[j] << " ";
 		}
-		//cout << endl;
 	}
 	readhobby.close();
-	ifstream readaddress(".\\address.txt");
+	
+	ifstream readaddress(".\\locations.txt");
 	if(!readaddress.is_open()){
 		cout<<"Failed to open the file!\n";
 	}
 	int i=0;
-	while(getline(readaddress,line)){
-		net[i].location=line;
-		i++;
+	for(i=0;i<n;i++){
+		readaddress>>net[i].location.cityname>>net[i].location.latitude>>net[i].location.longitude;
 	}
+	readaddress.close(); 
 //	for(i=0;i<n;i++){
-//		cout<<net[i].location<<endl;
+//		cout<<net[i].location.cityname<<" "
+//			<<net[i].location.latitude<<" "
+//			<<net[i].location.longitude<<endl;
 //	}
 
 	ifstream readname(".\\nameinfo.txt");
@@ -122,10 +132,9 @@ void Graph::setup() {
 	for(i=0;i<n;i++){
 		getline(readname,line);
 		net[i].name=line;
-		//cout<<net[i].name<<endl;
 	}
 	cout<<"数据读取完毕！"<<endl;
-	
+	readname.close();
 	//ShortestPath_Floyd(n);
 	
 	
@@ -235,15 +244,33 @@ float Graph::location_match(wstring s1,wstring s2){ //动态规划求最长子�
     else return (float)res/(m+n-2-res);
 }
 
+float rad(float d){
+    return d * pi /180.0;
+}
+
+float Graph::location_match(loca l1,loca l2){
+	float a;
+   	float b;
+   	float radLat1 = rad(l1.latitude);
+    float radLat2 = rad(l2.latitude);
+    a = radLat1 - radLat2;
+    b = rad(l1.longitude) - rad(l2.longitude);
+    float s = 2 * asin(sqrt(pow(sin(a/2),2) + cos(radLat1)*cos(radLat2)*pow(sin(b/2),2)));
+    s = s * EARTH_RADIUS;
+    if(s==0) return 1;
+    float res=1-atan(s/1000)/pi*2;
+    return res;
+    //return atan(s);
+}
 
 void Graph::all_location_match(){
 	int i,j;
 	for(i=0;i<n;i++){
 		for(j=0;j<n;j++){
 			if(i==j) continue;
-			wstring location1=str2wstr(net[i].location);
-			wstring location2=str2wstr(net[j].location);
-			location_simi[i][j]=location_match(location1,location2);
+//			wstring location1=str2wstr(net[i].location);
+//			wstring location2=str2wstr(net[j].location);
+			location_simi[i][j]=location_match(net[i].location,net[j].location);
 			location_simi[j][i]=location_simi[i][j];
 		}
 	}
@@ -291,19 +318,19 @@ void Graph::intimacy_caculate(int i) {
 	printf("1.同城优先  2.爱好相符  3.关系推荐\n");
 	scanf("%d",&select);
 	if(select==1){
-		dist=0.35;
-		loca=0.50;
-		hobby=0.15;
+		dist=0.15;
+		loca=0.65;
+		hobby=0.20;
 	}
 	else if(select==2){
-		hobby=0.70;
+		hobby=0.80;
 		dist=0.10;
-		loca=0.20;
+		loca=0.10;
 	}
 	else if(select==3){
 		dist=0.60;
-		loca=0.30;
-		hobby=0.10;
+		loca=0.10;
+		hobby=0.30;
 	}
 	else{
 		printf("输入非法！");
@@ -315,16 +342,16 @@ void Graph::intimacy_caculate(int i) {
 		hobby_sec= hobby_simi[i][j];
 		dist_sec=distance_trans(personLink[i][j]);
 		location_sec=location_simi[i][j];
-		nomination=sqrt(hobby_sec*hobby_sec+dist_sec*dist_sec+location_sec*location_sec);//归一化过程
-		hobby_sec=hobby_sec/nomination*hobby;
-		dist_sec=dist_sec/nomination*dist;
-		location_sec=location_sec/nomination*loca; 
+	//	nomination=sqrt(hobby_sec*hobby_sec+dist_sec*dist_sec+location_sec*location_sec);//归一化过程
+		hobby_sec=hobby_sec*hobby;
+		dist_sec=dist_sec*dist;
+		location_sec=location_sec*loca; 
 		intimacy=hobby_sec+dist_sec+location_sec;
 		if(i==j){
 			intimacy=-1;
 		}
 		relations[i][j].intimacy=intimacy;
-		//printf("%d--%.2f   ",relations[i][j].nodeid,relations[i][j].intimacy);
+	//	cout<<hobby_sec<<"+"<<dist_sec<<"+"<<location_sec<<" = "<<intimacy<<endl;
 	}
 //	for(j=0;j<n;j++){
 //		cout<<relations[i][j].nodeid<<"--"<<relations[i][j].intimacy;
@@ -358,6 +385,9 @@ void Graph::recommendation(int i){
 //	for(int j=0;j<n;j++){
 //		printf("%d  ",personLink[i][j]);
 //	}
+//	for(int j=0;j<n;j++){
+//		printf("%.3f  ",location_simi[i][j]);
+//	}
 //	printf("\n");
 	
 	sort(relations[i],relations[i]+n,cmp);//推荐排序1:亲密度排序
@@ -383,8 +413,15 @@ void Graph::recommendation(int i){
 	string out2=vertex+".csv";
 	write.open(out1,ios::out);
 	writev.open(out2,ios::out);
-	write<<"id"<<','<<"name"<<','<<"location"<<','<<"hobby1"<<','
-		 <<"hobby2"<<','<<"hobby3"<<','<<"hobby4"<<','<<"hobby5"<<','<<"hobby6"<<endl; 
+	write<<"id"<<','<<"name"<<','<<"location"<<','<<"hobbby similarity"<<','
+		 <<"location similatity"<<','<<"social distance"<<','<<endl; 
+	write<<net[i].node_id<<','<<net[i].name<<','<<net[i].location.cityname<<',';
+//	for(int a=0;a<16;a++){
+//		if(net[i].hobbys[a]==1){
+//			write<<hobbies[a]<<',';
+//		}
+//	}
+	write<<endl; 
 	int count=10;
 	for(int j=0;j<n;j++){
 		if(count<1) break; //推荐潜在亲密度最高的前10名 
@@ -413,12 +450,13 @@ void Graph::recommendation(int i){
 			Path.pop();
 			printf("%d->",k);
 			if(k!=i){
-				write<<net[k].node_id<<','<<net[k].name<<','<<net[k].location<<',';
-				for(int a=0;a<16;a++){
-					if(net[k].hobbys[a]==1){
-						write<<hobbies[a]<<',';
-					}
-				}
+				write<<net[k].node_id<<','<<net[k].name<<','<<net[k].location.cityname<<','
+				<<hobby_simi[i][k]<<','<<location_simi[i][k]<<','<<distance_trans(personLink[i][k])<<',';
+//				for(int a=0;a<16;a++){
+//					if(net[k].hobbys[a]==1){
+//						write<<hobbies[a]<<',';
+//					}
+//				}
 				write<<endl;
 			}
 			//write<<k<<" ";
@@ -433,7 +471,7 @@ void Graph::recommendation(int i){
 		
 		printf("您与ta的潜在亲密度为%.3f\n",relations[i][j].intimacy);
 		printf("爱好相似度为：%.3f,社交距离权重为%.3f,同城系数为%.3f\n",hobby_simi[i][per],distance_trans(personLink[i][per]),location_simi[i][per]);
-		cout<<i<<"来自"<<net[i].location<<","<<per<<"来自"<<net[per].location<<endl;
+		cout<<i<<"来自"<<net[i].location.cityname<<","<<per<<"来自"<<net[per].location.cityname<<endl;
 //		cout<<per<<"-"<<net[per].name<<"-"<<net[per].location<<endl;
 		//write<<"关系数据："<<hobby_simi[i][per]<<" "<<distance_trans(personLink[i][per])<<" "<<location_simi[i][per]<<endl;
 		
@@ -441,18 +479,25 @@ void Graph::recommendation(int i){
 		printf("在");
 		for(int a=0;a<16;a++){
 			if(net[i].hobbys[a]==1&&net[per].hobbys[a]==1){
-				printf("爱好%d ",a);
+				cout<<hobbies[a]<<" ";
 			}
 		}
 		printf("等有共同点\n");
 		
-		write<<net[per].node_id<<','<<net[per].name<<','<<net[per].location<<',';
-		for(int a=0;a<16;a++){
-			if(net[per].hobbys[a]==1){
-				write<<hobbies[a]<<',';
-			}
-		}
+		write<<net[per].node_id<<','<<net[per].name<<','<<net[per].location.cityname<<','<<hobby_simi[i][per]<<','
+			 <<location_simi[i][per]<<','<<distance_trans(personLink[i][per])<<',';
+//		for(int a=0;a<16;a++){
+//			if(net[per].hobbys[a]==1){
+//				write<<hobbies[a]<<',';
+//			}
+//		}
 		write<<endl; 
+	}
+	for(i=0;i<n;i++){
+		for(int j=0;j<n;j++){
+			relations[i][j].nodeid=j;
+			relations[i][j].intimacy=0;
+		}
 	}
 	write.close();
 	writev.close();
